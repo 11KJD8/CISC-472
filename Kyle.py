@@ -254,8 +254,7 @@ class KyleTest(ScriptedLoadableModuleTest):
     self.test_Kyle1()
 
   def test_Kyle1(self):
-    createModelsLogic = slicer.modules.createmodels.logic()
-    preModelNode = createModelsLogic.CreateCoordinate(20,2)
-    preModelNode.SetName('PreModel')
-    preModelNode.GetDisplayNode().SetColor(1,1,0)
-    print("Kyle")
+    modelToRas = slicer.vtkMRMLLinearTransformNode()
+    modelToRas.SetName('ModelToRas')
+    slicer.mrmlScene.AddNode(modelToRas)
+    print "Test complete"
