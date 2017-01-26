@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import numpy
 
 #
 # Kyle
@@ -254,7 +255,40 @@ class KyleTest(ScriptedLoadableModuleTest):
     self.test_Kyle1()
 
   def test_Kyle1(self):
-    modelToRas = slicer.vtkMRMLLinearTransformNode()
-    modelToRas.SetName('ModelToRas')
-    slicer.mrmlScene.AddNode(modelToRas)
+    #Jan 24
+    #modelToRas = slicer.vtkMRMLLinearTransformNode()
+    #modelToRas.SetName('ModelToRas')
+    #slicer.mrmlScene.AddNode(modelToRas)
+
+    #Jan 26
+    N = 10
+    Scale = 100.0
+    Sigma = 5
+
+    fromNormCoordinates = numpy.random.rand(N, 3)
+    noise = numpy.random.normal(0.0, Sigma, N*3)
+
+    RasFids = slicer.vtkMRMLMarkupsFiducialNode()
+    RasFids.SetName('Ras')
+    slicer.mrmlScene.AddNode(RasFids)
+
+    ReferenceFids = slicer.vtkMRMLMarkupsFiducialNode()
+    ReferenceFids.SetName('Reference')
+    slicer.mrmlScene.AddNode(ReferenceFids)
+    ReferenceFids.GetDisplayNode().SetSelectedColor(1,1,0)
+
+    RasPoints = vtk.vtkPoints()
+    ReferencePoints = vtk.vtkPoints()
+    for i in range(N):
+      x = (fromNormCoordinates[i, 0] - 0.5) * Scale
+      y = (fromNormCoordinates[i, 1] - 0.5) * Scale
+      z = (fromNormCoordinates[i, 2] - 0.5) * Scale
+      RasFids.AddFiducial(x, y, z)
+      RasPoints.InsertNextPoint(x, y, z)
+      xx = x+noise[i*3]
+      yy = y+noise[i*3+1]
+      zz = z+noise[i*3+2]
+      ReferenceFids.AddFiducial(xx, yy, zz)
+      ReferencePoints.InsertNextPoint(xx, yy, zz)
+    
     print "Test complete"
