@@ -291,4 +291,34 @@ class KyleTest(ScriptedLoadableModuleTest):
       ReferenceFids.AddFiducial(xx, yy, zz)
       ReferencePoints.InsertNextPoint(xx, yy, zz)
     
+    #Jan 27
+    #Create coordinate models using the CreateModels module
+    createModelsLogic = slicer.modules.createmodels.logic()
+    RasModelNode = createModelsLogic.CreateCoordinate(20,2)
+    RasModelNode.SetName('RasCoordinateModel')
+    ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
+    ReferenceModelNode.SetName('ReferenceCoordinateModel')
+    
+    # Change the color of models
+    RasModelNode.GetDisplayNode().SetColor(1,0,0)
+    ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
+
+    #Reference transform node
+    ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
+    ReferenceModelToRas.SetName('ReferenceModelToRas')
+    slicer.mrmlScene.AddNode(ReferenceModelToRas)
+
+    #Set transform of the transform node
+    ReferenceModelToRasTransform = vtk.vtkTransform()
+    ReferenceModelToRasTransform.PostMultiply()
+    ReferenceModelToRasTransform.Translate(0, 100, 0)
+    ReferenceModelToRasTransform.RotateX(30)
+    ReferenceModelToRasTransform.Update()
+    ReferenceModelToRas.SetAndObserveTransformToParent(ReferenceModelToRasTransform)
+
+    # Transform the models with transform nodes
+    ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
+        
+    
+    
     print "Test complete"
