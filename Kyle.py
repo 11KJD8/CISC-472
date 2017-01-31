@@ -319,6 +319,44 @@ class KyleTest(ScriptedLoadableModuleTest):
     # Transform the models with transform nodes
     ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
         
+    #Jan 31
+    # Create landmark transform object that computes registration
+    landmarkTransform = vtk.vtkLandmarkTransform()
+    landmarkTransform.SetSourceLandmarks( RasPoints )
+    landmarkTransform.SetTargetLandmarks( ReferencePoints )
+    landmarkTransform.SetModeToRigidBody()
+    landmarkTransform.Update()
+
+    ReferenceToRasMatrix = vtk.vtkMatrix4x4()
+    landmarkTransform.GetMatrix( ReferenceToRasMatrix )
+
+    det = ReferenceToRasMatrix.Determinant()
+    if det < 1e-8:
+      print 'Unstable registration. Check input for collinear points.'
+
+    ReferenceToRas.SetMatrixTransformToParent(ReferenceToRasMatrix)
+
+    # Compute average point distance after registration
+
+    average = 0.0
+    numbersSoFar = 0
+
+    for i in range(N):
+      numbersSoFar = numbersSoFar + 1
+      ras = RasPoints.GetPoint(i)
+      pointA_Ras = numpy.array(ras)
+      pointA_Ras = numpy.append(pointA_Ras, 1)
+      pointA_Reference = ReferenceToRasMatrix.MultiplyFloatPoint(pointA_Ras)
+      ref = ReferencePoints.GetPoint(i)
+      pointB_Ref = numpy.array(ref)
+      pointB_Ref = numpy.append(pointB_Ref, 1)
+      distance = numpy.linalg.norm(pointA_Ras - pointB_Ref)
+      average = average + (distance - average) / numbersSoFar
+
+    print "Average distance after registration: " + str(average)
+    targetPoint_Reference = numpy.array([0,0,0,1])
+    targetPoint_Ras = ReferenceToRasMatrix.MultiplyFloatPoint(targetPoint_Reference)
+    d = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
     
     
     print "Test complete"
