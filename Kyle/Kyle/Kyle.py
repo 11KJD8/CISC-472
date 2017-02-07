@@ -3,6 +3,7 @@ import unittest
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 import logging
+import numpy
 
 #
 # Kyle
@@ -233,6 +234,25 @@ class KyleLogic(ScriptedLoadableModuleLogic):
 
     return True
 
+  def avgerageDistancePoints(self,RasPoints,ReferencePoints,ReferenceToRasMatrix):
+    # Compute average point distance after registration
+    average = 0.0
+    numbersSoFar = 0
+    N = RasPoints.GetNumberOfPoints()
+    for i in range(N):
+      numbersSoFar = numbersSoFar + 1
+      ras = RasPoints.GetPoint(i)
+      pointA_Ras = numpy.array(ras)
+      pointA_Ras = numpy.append(pointA_Ras, 1)
+      pointA_Reference = ReferenceToRasMatrix.MultiplyFloatPoint(pointA_Ras)
+      ref = ReferencePoints.GetPoint(i)
+      pointB_Ref = numpy.array(ref)
+      pointB_Ref = numpy.append(pointB_Ref, 1)
+      distance = numpy.linalg.norm(pointA_Ras - pointB_Ref)
+      average = average + (distance - average) / numbersSoFar
+    #print "Average distance after registration: " + str(average)
+    return average
+
 
 class KyleTest(ScriptedLoadableModuleTest):
   """
@@ -253,7 +273,9 @@ class KyleTest(ScriptedLoadableModuleTest):
     self.test_Kyle1()
 
   def test_Kyle1(self):
-    import numpy
+    logic = KyleLogic()
+
+    
     #Jan 24
     ReferenceToRas = slicer.vtkMRMLLinearTransformNode()
     ReferenceToRas.SetName('ReferenceToRas')
@@ -287,19 +309,17 @@ class KyleTest(ScriptedLoadableModuleTest):
       ReferencePoints.InsertNextPoint(xx, yy, zz)
 
     #Jan 27
-    #createModelsLogic = slicer.modules.createmodels.logic()
-    #RasModelNode = createModelsLogic.CreateCoordinate(20,2)
-    #RasModelNode.SetName('RasCoordinateModel')
-    #ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
-    #ReferenceModelNode.SetName('ReferenceCoordinateModel')
-    #RasModelNode.GetDisplayNode().SetColor(1,0,0)
-    #ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
-    #ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
-    #ReferenceModelToRas.SetName('ReferenceModelToRas')
-    #slicer.mrmlScene.AddNode(ReferenceModelToRas)
-    #ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
-
-
+    createModelsLogic = slicer.modules.createmodels.logic()
+    RasModelNode = createModelsLogic.CreateCoordinate(20,2)
+    RasModelNode.SetName('RasCoordinateModel')
+    ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
+    ReferenceModelNode.SetName('ReferenceCoordinateModel')
+    RasModelNode.GetDisplayNode().SetColor(1,0,0)
+    ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
+    ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
+    ReferenceModelToRas.SetName('ReferenceModelToRas')
+    slicer.mrmlScene.AddNode(ReferenceModelToRas)
+    ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
 
     #Jan 31
     # Create landmark transform object that computes registration
@@ -318,29 +338,59 @@ class KyleTest(ScriptedLoadableModuleTest):
 
     ReferenceToRas.SetMatrixTransformToParent(ReferenceToRasMatrix)
 
-    # Compute average point distance after registration
+    averageDistance = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
+    #print "Average distance after registration: " + str(averageDistance)
 
-    average = 0.0
-    numbersSoFar = 0
-
-    for i in range(N):
-      numbersSoFar = numbersSoFar + 1
-      ras = RasPoints.GetPoint(i)
-      pointA_Ras = numpy.array(ras)
-      pointA_Ras = numpy.append(pointA_Ras, 1)
-      pointA_Reference = ReferenceToRasMatrix.MultiplyFloatPoint(pointA_Ras)
-      ref = ReferencePoints.GetPoint(i)
-      pointB_Ref = numpy.array(ref)
-      pointB_Ref = numpy.append(pointB_Ref, 1)
-      distance = numpy.linalg.norm(pointA_Ras - pointB_Ref)
-      average = average + (distance - average) / numbersSoFar
-    print "Average distance after registration: " + str(average)
-
+    #Feb 2
     targetPoint_Reference = numpy.array([0,0,0,1])
     targetPoint_Ras = ReferenceToRasMatrix.MultiplyFloatPoint(targetPoint_Reference)
     d = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
-    print('TRE = ' + str(d))
+    #print('TRE = ' + str(d))
 
+
+    #Feb 7
+    N = 10
+    for i in range(N):
+      Scale = 100.0
+      Sigma = 3
+      fromNormCoordinates = numpy.random.rand(N, 3)
+      noise = numpy.random.normal(0.0, Sigma, N*3)
+      RasFids = slicer.vtkMRMLMarkupsFiducialNode()
+      RasFids.SetName('RasPoints')
+      slicer.mrmlScene.AddNode(RasFids)
+      ReferenceFids = slicer.vtkMRMLMarkupsFiducialNode()
+      ReferenceFids.SetName('ReferencePoints')
+      slicer.mrmlScene.AddNode(ReferenceFids)
+      ReferenceFids.GetDisplayNode().SetSelectedColor(1,1,0)
+      RasPoints = vtk.vtkPoints() #Used for registration
+      ReferencePoints = vtk.vtkPoints()
+      for j in range(N):
+        x = (fromNormCoordinates[j, 0] - 0.5) * Scale
+        y = (fromNormCoordinates[j, 1] - 0.5) * Scale
+        z = (fromNormCoordinates[j, 2] - 0.5) * Scale
+        RasFids.AddFiducial(x, y, z) #For visualization in 
+        RasPoints.InsertNextPoint(x, y, z)
+        xx = x+noise[j*3]
+        yy = y+noise[j*3+1]
+        zz = z+noise[j*3+2]
+        ReferenceFids.AddFiducial(xx, yy, zz)
+        ReferencePoints.InsertNextPoint(xx, yy, zz)
+
+      ReferenceToRasMatrix = vtk.vtkMatrix4x4()
+  
+      det = ReferenceToRasMatrix.Determinant()
+      if det < 1e-8:
+        print 'Unstable registration. Check input for collinear points.'
+
+      ReferenceToRas.SetMatrixTransformToParent(ReferenceToRasMatrix)
+
+      averageDistance = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
+      print "Average distance after registration: " + str(averageDistance)
+
+      targetPoint_Reference = numpy.array([0,0,0,1])
+      targetPoint_Ras = ReferenceToRasMatrix.MultiplyFloatPoint(targetPoint_Reference)
+      d = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
+      print('TRE = ' + str(d))
     
     
     print('Test complete')
