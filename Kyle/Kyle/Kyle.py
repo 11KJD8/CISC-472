@@ -234,57 +234,15 @@ class KyleLogic(ScriptedLoadableModuleLogic):
 
     return True
 
-  def avgerageDistancePoints(self,RasPoints,ReferencePoints,ReferenceToRasMatrix):
-    # Compute average point distance after registration
-    average = 0.0
-    numbersSoFar = 0
-    N = RasPoints.GetNumberOfPoints()
-    for i in range(N):
-      numbersSoFar = numbersSoFar + 1
-      ras = RasPoints.GetPoint(i)
-      pointA_Ras = numpy.array(ras)
-      pointA_Ras = numpy.append(pointA_Ras, 1)
-      pointA_Reference = ReferenceToRasMatrix.MultiplyFloatPoint(pointA_Ras)
-      ref = ReferencePoints.GetPoint(i)
-      pointB_Ref = numpy.array(ref)
-      pointB_Ref = numpy.append(pointB_Ref, 1)
-      distance = numpy.linalg.norm(pointA_Ras - pointB_Ref)
-      average = average + (distance - average) / numbersSoFar
-    #print "Average distance after registration: " + str(average)
-    return average
-
-
-class KyleTest(ScriptedLoadableModuleTest):
-  """
-  This is the test case for your scripted module.
-  Uses ScriptedLoadableModuleTest base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-  """
-
-  def setUp(self):
-    """ Do whatever is needed to reset the state - typically a scene clear will be enough.
-    """
-    slicer.mrmlScene.Clear(0)
-
-  def runTest(self):
-    """Run as few or as many tests as needed here.
-    """
-    self.setUp()
-    self.test_Kyle1()
-
-  def test_Kyle1(self):
-    logic = KyleLogic()
-
-    
+  def GenerateTransformPoints(self,N,err):
     #Jan 24
     ReferenceToRas = slicer.vtkMRMLLinearTransformNode()
     ReferenceToRas.SetName('ReferenceToRas')
     slicer.mrmlScene.AddNode(ReferenceToRas)
 
     #Jan 26
-    N = 10
     Scale = 100.0
-    Sigma = 5
+    Sigma = err
     fromNormCoordinates = numpy.random.rand(N, 3)
     noise = numpy.random.normal(0.0, Sigma, N*3)
     RasFids = slicer.vtkMRMLMarkupsFiducialNode()
@@ -307,90 +265,134 @@ class KyleTest(ScriptedLoadableModuleTest):
       zz = z+noise[i*3+2]
       ReferenceFids.AddFiducial(xx, yy, zz)
       ReferencePoints.InsertNextPoint(xx, yy, zz)
+    return [ReferencePoints,RasPoints,ReferenceToRas]
 
-    #Jan 27
-    createModelsLogic = slicer.modules.createmodels.logic()
-    RasModelNode = createModelsLogic.CreateCoordinate(20,2)
-    RasModelNode.SetName('RasCoordinateModel')
-    ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
-    ReferenceModelNode.SetName('ReferenceCoordinateModel')
-    RasModelNode.GetDisplayNode().SetColor(1,0,0)
-    ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
-    ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
-    ReferenceModelToRas.SetName('ReferenceModelToRas')
-    slicer.mrmlScene.AddNode(ReferenceModelToRas)
-    ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
 
-    #Jan 31
-    # Create landmark transform object that computes registration
+  def registration(self,ReferencePoints,RasPoints,ReferenceToRas):
+    #Jan 31: Create landmark transform object that computes registration
     landmarkTransform = vtk.vtkLandmarkTransform()
     landmarkTransform.SetSourceLandmarks( RasPoints )
     landmarkTransform.SetTargetLandmarks( ReferencePoints )
     landmarkTransform.SetModeToRigidBody()
     landmarkTransform.Update()
-
     ReferenceToRasMatrix = vtk.vtkMatrix4x4()
     landmarkTransform.GetMatrix( ReferenceToRasMatrix )
-
     det = ReferenceToRasMatrix.Determinant()
     if det < 1e-8:
       print 'Unstable registration. Check input for collinear points.'
-
     ReferenceToRas.SetMatrixTransformToParent(ReferenceToRasMatrix)
+    #averageDistance = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
+    return ReferenceToRasMatrix 
 
-    averageDistance = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
-    #print "Average distance after registration: " + str(averageDistance)
+  def avgerageDistancePoints(self,RasPoints,ReferencePoints,ReferenceToRasMatrix):
+    # Compute average point distance after registration
+    average = 0.0
+    numbersSoFar = 0
+    N = RasPoints.GetNumberOfPoints()
+    for i in range(N):
+      numbersSoFar = numbersSoFar + 1
+      ras = RasPoints.GetPoint(i)
+      pointA_Ras = numpy.array(ras)
+      pointA_Ras = numpy.append(pointA_Ras, 1)
+      pointA_Reference = ReferenceToRasMatrix.MultiplyFloatPoint(pointA_Ras)
+      ref = ReferencePoints.GetPoint(i)
+      pointB_Ref = numpy.array(ref)
+      pointB_Ref = numpy.append(pointB_Ref, 1)
+      distance = numpy.linalg.norm(pointA_Ras - pointB_Ref)
+      average = average + (distance - average) / numbersSoFar
+    #print "Average distance after registration: " + str(average)
+    return average
 
-    #Feb 2
+  def TRE(self,ReferenceToRasMatrix):
+    #Feb 2: Computes the target registration error
     targetPoint_Reference = numpy.array([0,0,0,1])
     targetPoint_Ras = ReferenceToRasMatrix.MultiplyFloatPoint(targetPoint_Reference)
-    d = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
-    #print('TRE = ' + str(d))
+    distance = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
+    #print('TRE = ' + str(distance))
+    return distance
 
+
+class KyleTest(ScriptedLoadableModuleTest):
+  """
+  This is the test case for your scripted module.
+  Uses ScriptedLoadableModuleTest base class, available at:
+  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
+  """
+
+  def setUp(self):
+    """ Do whatever is needed to reset the state - typically a scene clear will be enough.
+    """
+    slicer.mrmlScene.Clear(0)
+
+  def runTest(self):
+    """Run as few or as many tests as needed here.
+    """
+    self.setUp()
+    self.test_Kyle1()
+
+  def test_Kyle1(self):
+    logic = KyleLogic()
+    #Jan 27
+    #createModelsLogic = slicer.modules.createmodels.logic()
+    #RasModelNode = createModelsLogic.CreateCoordinate(20,2)
+    #RasModelNode.SetName('RasCoordinateModel')
+    #ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
+    #ReferenceModelNode.SetName('ReferenceCoordinateModel')
+    #RasModelNode.GetDisplayNode().SetColor(1,0,0)
+    #ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
+    #ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
+    #ReferenceModelToRas.SetName('ReferenceModelToRas')
+    #slicer.mrmlScene.AddNode(ReferenceModelToRas)
+    #ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
 
     #Feb 7
-    N = 10
-    for i in range(N):
-      Scale = 100.0
-      Sigma = 3
-      fromNormCoordinates = numpy.random.rand(N, 3)
-      noise = numpy.random.normal(0.0, Sigma, N*3)
-      RasFids = slicer.vtkMRMLMarkupsFiducialNode()
-      RasFids.SetName('RasPoints')
-      slicer.mrmlScene.AddNode(RasFids)
-      ReferenceFids = slicer.vtkMRMLMarkupsFiducialNode()
-      ReferenceFids.SetName('ReferencePoints')
-      slicer.mrmlScene.AddNode(ReferenceFids)
-      ReferenceFids.GetDisplayNode().SetSelectedColor(1,1,0)
-      RasPoints = vtk.vtkPoints() #Used for registration
-      ReferencePoints = vtk.vtkPoints()
-      for j in range(N):
-        x = (fromNormCoordinates[j, 0] - 0.5) * Scale
-        y = (fromNormCoordinates[j, 1] - 0.5) * Scale
-        z = (fromNormCoordinates[j, 2] - 0.5) * Scale
-        RasFids.AddFiducial(x, y, z) #For visualization in 
-        RasPoints.InsertNextPoint(x, y, z)
-        xx = x+noise[j*3]
-        yy = y+noise[j*3+1]
-        zz = z+noise[j*3+2]
-        ReferenceFids.AddFiducial(xx, yy, zz)
-        ReferencePoints.InsertNextPoint(xx, yy, zz)
+    def avgDistanceAndTRE():
+      FREs = []
+      TREs = []
+      numPoints = range(10,60,5)
+      len_numPoints = len(numPoints)
+      print(len_numPoints)
+      error = 3.0
+      for num in numPoints:
+        [ReferencePoints,RasPoints,ReferenceToRas] = logic.GenerateTransformPoints(num,error)
+        ReferenceToRasMatrix = logic.registration(ReferencePoints,RasPoints,ReferenceToRas)
+        FRE = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
+        print "Average distance: " + str(FRE)
+        FREs.append(FRE)
+        TRE = logic.TRE(ReferenceToRasMatrix)
+        print("TRE = " + str(TRE))
+        TREs.append(TRE)
 
-      ReferenceToRasMatrix = vtk.vtkMatrix4x4()
-  
-      det = ReferenceToRasMatrix.Determinant()
-      if det < 1e-8:
-        print 'Unstable registration. Check input for collinear points.'
+      #Feb 9
+      lns = slicer.mrmlScene.GetNodesByClass('vtkMRMLLayoutNode')
+      lns.InitTraversal()
+      ln = lns.GetNextItemAsObject()
+      ln.SetViewArrangement(24)
+      # Get the Chart View Node
+      cvns = slicer.mrmlScene.GetNodesByClass('vtkMRMLChartViewNode')
+      cvns.InitTraversal()
+      cvn = cvns.GetNextItemAsObject()
+      # Create an Array Node and add some data
+      TRE_dn = slicer.mrmlScene.AddNode(slicer.vtkMRMLDoubleArrayNode())
+      arrayTRE =TRE_dn.GetArray()
+      arrayTRE.SetNumberOfTuples(len_numPoints)
+      for i in range(len_numPoints):
+          arrayTRE.SetComponent(i, 0, numPoints[i])
+          arrayTRE.SetComponent(i, 1, TREs[i])
+          arrayTRE.SetComponent(i, 2, 0)
+      # Create a Chart Node.
+      cn = slicer.mrmlScene.AddNode(slicer.vtkMRMLChartNode())
+      # Add the Array Nodes to the Chart. The first argument is a string used for the legend and to refer to the Array when setting properties.
+      cn.AddArray('TRE', TRE_dn.GetID())
 
-      ReferenceToRas.SetMatrixTransformToParent(ReferenceToRasMatrix)
+      # Set a few properties on the Chart. The first argument is a string identifying which Array to assign the property. 
+      # 'default' is used to assign a property to the Chart itself (as opposed to an Array Node).
+      cn.SetProperty('default', 'title', 'TRE')
+      cn.SetProperty('default', 'xAxisLabel', 'Number of Points')
+      cn.SetProperty('default', 'yAxisLabel', 'Units')
 
-      averageDistance = logic.avgerageDistancePoints(RasPoints,ReferencePoints,ReferenceToRasMatrix)
-      print "Average distance after registration: " + str(averageDistance)
+      # Tell the Chart View which Chart to display
+      cvn.SetChartNodeID(cn.GetID())
 
-      targetPoint_Reference = numpy.array([0,0,0,1])
-      targetPoint_Ras = ReferenceToRasMatrix.MultiplyFloatPoint(targetPoint_Reference)
-      d = numpy.linalg.norm(targetPoint_Reference - targetPoint_Ras)
-      print('TRE = ' + str(d))
-    
-    
+    avgDistanceAndTRE()
     print('Test complete')
