@@ -316,6 +316,8 @@ class KyleLogic(ScriptedLoadableModuleLogic):
       zz = z+noise[i*3+2]
       ReferenceFids.AddFiducial(xx, yy, zz)
       ReferencePoints.InsertNextPoint(xx, yy, zz)
+      slicer.mrmlScene.RemoveNode(ReferenceFids)
+      slicer.mrmlScene.RemoveNode(RasFids)
     return [ReferencePoints,RasPoints,ReferenceToRas]
 
 
@@ -407,7 +409,6 @@ class KyleTest(ScriptedLoadableModuleTest):
       TREs = []
       numPoints = range(10,60,5)
       len_numPoints = len(numPoints)
-      print(len_numPoints)
       error = 3.0
       for num in numPoints:
         [ReferencePoints,RasPoints,ReferenceToRas] = logic.GenerateTransformPoints(num,error)
@@ -418,6 +419,7 @@ class KyleTest(ScriptedLoadableModuleTest):
         TRE = logic.TRE(ReferenceToRasMatrix)
         print("TRE = " + str(TRE))
         TREs.append(TRE)
+
 
       #Feb 9
       lns = slicer.mrmlScene.GetNodesByClass('vtkMRMLLayoutNode')
@@ -448,7 +450,6 @@ class KyleTest(ScriptedLoadableModuleTest):
       cn.SetProperty('default', 'yAxisLabel', 'Units')
 
       # Tell the Chart View which Chart to display
-      cvn.SetChartNodeID(cn.GetID())
-
+      cvn.SetChartNodeID(cn.GetID()) 
     avgDistanceAndTRE()
     print('Test complete')
