@@ -384,17 +384,22 @@ class KyleTest(ScriptedLoadableModuleTest):
   def test_Kyle1(self):
     logic = KyleLogic()
     #Jan 27
-    #createModelsLogic = slicer.modules.createmodels.logic()
-    #RasModelNode = createModelsLogic.CreateCoordinate(20,2)
-    #RasModelNode.SetName('RasCoordinateModel')
-    #ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
-    #ReferenceModelNode.SetName('ReferenceCoordinateModel')
-    #RasModelNode.GetDisplayNode().SetColor(1,0,0)
-    #ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
-    #ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
-    #ReferenceModelToRas.SetName('ReferenceModelToRas')
-    #slicer.mrmlScene.AddNode(ReferenceModelToRas)
-    #ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
+    #Create Models
+    createModelsLogic = slicer.modules.createmodels.logic()
+    RasModelNode = createModelsLogic.CreateCoordinate(20,2)
+    RasModelNode.SetName('RasCoordinateModel')
+    ReferenceModelNode = createModelsLogic.CreateCoordinate(20,2)
+    ReferenceModelNode.SetName('ReferenceCoordinateModel')
+
+    #Set colours
+    RasModelNode.GetDisplayNode().SetColor(1,0,0)
+    ReferenceModelNode.GetDisplayNode().SetColor(0,0,1)
+
+    #Transform Reference Node
+    ReferenceModelToRas = slicer.vtkMRMLLinearTransformNode()
+    ReferenceModelToRas.SetName('ReferenceModelToRas')
+    slicer.mrmlScene.AddNode(ReferenceModelToRas)
+    ReferenceModelNode.SetAndObserveTransformNodeID(ReferenceModelToRas.GetID())
 
     #Feb 7
     def avgDistanceAndTRE():
